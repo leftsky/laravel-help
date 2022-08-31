@@ -19,13 +19,9 @@
   "require": {
     "php": "^8.0",
     "ext-json": "*",
-    "ext-sodium": "*",
     "laravel/framework": "^9.0",
     "doctrine/dbal": "^3.4",
-    "w7corp/easywechat": "^6.7",
-    "yansongda/pay": "~3.1.0",
     "guzzlehttp/guzzle": "^7.0",
-    "overtrue/easy-sms": "^2.2",
     "aliyuncs/oss-sdk-php": "^2.6"
   }
 }
