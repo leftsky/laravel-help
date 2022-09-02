@@ -7,6 +7,7 @@ use Doctrine\DBAL\Types\BooleanType;
 use Doctrine\DBAL\Types\DateTimeType;
 use Doctrine\DBAL\Types\DateType;
 use Doctrine\DBAL\Types\IntegerType;
+use Doctrine\DBAL\Types\JsonType;
 use Doctrine\DBAL\Types\StringType;
 use Doctrine\DBAL\Types\TextType;
 use Illuminate\Http\Request;
@@ -37,10 +38,16 @@ trait SimpleCurd
             $this->columns [] = [
                 "name" => $key,
                 "required" => $column->getNotnull(),
-                "label" => $column->getComment() ?? $key,
+                "label" => $column->getComment() ?? match ($key) {
+                        "created_at" => "创建时间",
+                        "updated_at" => "更新时间",
+                        "deleted_at" => "删除时间",
+                        default => $key
+                    },
                 "type" => match ($column->getType()::class) {
                     IntegerType::class, BigIntType::class => "integer",
                     BooleanType::class => "boolean",
+                    JsonType::class => "json",
                     TextType::class => "text",
                     StringType::class => "string",
                     DateTimeType::class => "datetime",
@@ -98,9 +105,9 @@ trait SimpleCurd
         // 初始化模型
         $list = $this->dbModel::with([]);
         // 根据列名字段筛选匹配
-        foreach ($this->columnName as $column) {
-            $this->getWhere($argvs[$column] ?? null, $column, $list);
-            $this->getWhere($argvs["filter"][$column] ?? null, $column, $list);
+        foreach ($this->columns as $column) {
+            $this->getWhere($argvs[$column["name"]] ?? null, $column, $list);
+            $this->getWhere($argvs["filter"][$column["name"]] ?? null, $column, $list);
         }
 
         // 如果设置了排序字段
@@ -129,16 +136,26 @@ trait SimpleCurd
 
     private function getWhere(mixed $cValue, $column, $list)
     {
+        if ($cValue === null) return;
+        $cValue = match ($column["type"]) {
+            "boolean" => in_array(strtolower($cValue), [1, "true"]),
+            "integer" => intval($cValue),
+            default => $cValue
+        };
         switch (gettype($cValue)) {
             case "NULL":
                 break;
+            case "boolean":
+            case "integer":
+                $list->where($column["name"], $cValue);
+                break;
             case "string":
-                if (in_array($column, $this->likeOpColumns))
-                    $list->where($column, "like", "%$cValue%");
-                else $list->where($column, $cValue);
+                if (in_array($column["name"], $this->likeOpColumns))
+                    $list->where($column["name"], "like", "%$cValue%");
+                else $list->where($column["name"], $cValue);
                 break;
             case "array":
-                $list->whereIn($column, $cValue);
+                $list->whereIn($column["name"], $cValue);
                 break;
         }
     }
@@ -146,8 +163,7 @@ trait SimpleCurd
     public function modify(Request $request)
     {
         $argvValidates = [
-            "id" => "required|integer",
-            "data" => "required|array"
+            "id" => "required|integer"
         ];
         // 循环载入列名
         foreach ($this->columnName as $item) {
