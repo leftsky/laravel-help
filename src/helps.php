@@ -27,8 +27,8 @@ const ERR_API_TOKEN = 0xFFFE0000;
 // API 权限 认证失败
 const ERR_API_AUTH = 0xFFFE0001;
 
-if (!function_exists('defineToMsg')) {
-    function defineToMsg(int $code): string
+if (!function_exists('define_to_message')) {
+    function define_to_message(int $code): string
     {
         return match ($code) {
             ERR_SUCCESS => '操作成功',
@@ -46,8 +46,8 @@ if (!function_exists('defineToMsg')) {
     }
 }
 
-if (!function_exists('defineToStatusCode')) {
-    function defineToStatusCode(int $code): int
+if (!function_exists('define_to_status_code')) {
+    function define_to_status_code(int $code): int
     {
         return match ($code) {
             ERR_NOT_LOGIN, ERR_API_TOKEN, ERR_API_AUTH => 401,
@@ -68,9 +68,9 @@ if (!function_exists('rsps')) {
     {
         return response([
             "code" => $code,
-            "msg" => $msg ?? defineToMsg($code),
+            "msg" => $msg ?? define_to_message($code),
             "data" => $data
-        ], defineToStatusCode($code));
+        ], define_to_status_code($code));
     }
 }
 
@@ -94,13 +94,13 @@ if (!function_exists('is_json')) {
     }
 }
 
-if (!function_exists('explodeOrEmpty')) {
+if (!function_exists('explode_or_empty')) {
     /**
      * 判断是否是字符串并且切割
      * @param string $string
      * @return array
      */
-    function explodeOrEmpty(string $string): array
+    function explode_or_empty(string $string): array
     {
         if (!$string || !is_string($string) || strlen($string) <= 0) return [];
         return explode(",", $string);
@@ -154,6 +154,24 @@ if (!function_exists("decode_shuxiang")) {
     }
 }
 
+if (!function_exists("get_chinese_zodiac_year")) {
+
+    /**
+     * 根据年份获取生肖年
+     *
+     * @param int $year 正数公元元年之后，负数公元前，0非法。
+     * @return string|null 正确返回生肖，错误返回 null
+     */
+    function get_chinese_zodiac_year(int $year): ?string
+    {
+        if ($year === 0) return null;
+        $array = ['猴', '鸡', '狗', '猪', '鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊'];
+        $point = $year > 0 ? $year % 12 : ($year + 1) % 12;
+        $point = $point >= 0 ? $point : $point + 12;
+        return $array[$point];
+    }
+}
+
 if (!function_exists("check_extensions")) {
     /**
      * 校验是否加载了扩展，全部加载则返回true；未加载直接返回未加载的扩展
@@ -172,7 +190,7 @@ if (!function_exists("check_extensions")) {
 }
 
 
-if (!function_exists('randomCode')) {
+if (!function_exists('random_code')) {
     /**
      * 随机指定长度的字符串
      * @param int $len
@@ -180,7 +198,7 @@ if (!function_exists('randomCode')) {
      * @param bool $hasUpCase
      * @return string
      */
-    function randomCode(int $len = 10, bool $hasNumber = false, bool $hasUpCase = false): string
+    function random_code(int $len = 10, bool $hasNumber = false, bool $hasUpCase = false): string
     {
         $arr = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
             "r", "s", "t", "u", "v", "w", "x", "y", "z"];
@@ -196,8 +214,8 @@ if (!function_exists('randomCode')) {
     }
 }
 
-if (!function_exists("decode_cityCode")) {
-    function decode_cityCode(string $code): string
+if (!function_exists("decode_citycode")) {
+    function decode_citycode(string $code): string
     {
         $arr = json_decode(file_get_contents(__DIR__ . "/jsons/cityCode.json"), true);
         $cities = $arr["cities"] ?? [];
@@ -221,8 +239,8 @@ if (!function_exists("fix_img")) {
     }
 }
 
-if (!function_exists('tryUrl')) {
-    function tryUrl(string $url): bool
+if (!function_exists('try_url')) {
+    function try_url(string $url): bool
     {
         $client = new \GuzzleHttp\Client([
             "timeout" => 1

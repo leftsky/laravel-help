@@ -1,5 +1,7 @@
 <?php
 
+namespace Leftsky\LaravelHelp\Files;
+
 use OSS\Core\OssException;
 use OSS\OssClient;
 

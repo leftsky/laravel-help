@@ -1,6 +1,6 @@
 <?php
 
-namespace Leftsky\LaravelHelp;
+namespace Leftsky\LaravelHelp\SimpleCurd;
 
 use Doctrine\DBAL\ParameterType;
 use Doctrine\DBAL\Platforms\AbstractPlatform;

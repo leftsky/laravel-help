@@ -1,6 +1,6 @@
 <?php
 
-namespace Leftsky\LaravelHelp;
+namespace Leftsky\LaravelHelp\SimpleCurd;
 
 use Doctrine\DBAL\Types\BigIntType;
 use Doctrine\DBAL\Types\BooleanType;
@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 trait SimpleCurd
 {
     private mixed $dbModel;
+    private array $columns = [];
     private array $columnName = [];
     private array $noUpdate = ["id", "create_at", "updated_at", "deleted_at"];
     private array $likeOpColumns = ["name", "title"];
@@ -23,10 +24,8 @@ trait SimpleCurd
      */
     public function __construct()
     {
-
-        if (!isset($this->model) || !class_exists($this->model)) {
+        if (!isset($this->model) || !class_exists($this->model))
             throw new \Exception();
-        }
         $this->dbModel = app($this->model);
 //        $this->dbModel = new YourModal();
         $con = $this->dbModel->getConnection();
@@ -49,12 +48,6 @@ trait SimpleCurd
                     EnumType::class => "enum",
                     default => null
                 },
-                "cc" => [
-                    $column,
-                    $column->getPrecision(),
-                    $column->getPrecision(),
-                    $column->getPrecision(),
-                ],
                 "length" => $column->getLength() ?? 0,
                 "valueList" => match ($column->getType()::class) {
                     EnumType::class => $this->dbModel->enums[$key] ?? [],
@@ -62,7 +55,6 @@ trait SimpleCurd
                 }
             ];
         }
-//        dd($this->columns);
         $this->columnName = array_column($this->columns, "name");
     }
 
@@ -149,6 +141,57 @@ trait SimpleCurd
                 $list->whereIn($column, $cValue);
                 break;
         }
+    }
+
+    public function modify(Request $request)
+    {
+        $argvValidates = [
+            "id" => "required|integer",
+            "data" => "required|array"
+        ];
+        // 循环载入列名
+        foreach ($this->columnName as $item) {
+            if (!in_array($item, $this->noUpdate))
+                $argvValidates[$item] = "nullable";
+        }
+        $argvs = $request->validate($argvValidates);
+        if (!$item = $this->dbModel::find($argvs["id"])) {
+            return rsps(ERR_FAILED, null, "查询不到记录");
+        }
+        foreach ($argvs as $key => $value) {
+            $item->{$key} = $value;
+        }
+        $item->save();
+
+        return rsps(ERR_SUCCESS, $item);
+    }
+
+    public function info(Request $request)
+    {
+        $argvs = $request->validate([
+            "id" => "required|integer"
+        ]);
+        return rsps(ERR_SUCCESS, $this->dbModel::find($argvs["id"]));
+    }
+
+    public function del(Request $request)
+    {
+        $argvs = $request->validate([
+            "id" => "required|integer"
+        ]);
+        $this->dbModel::where("id", $argvs["id"])->delete();
+        return rsps(ERR_SUCCESS);
+    }
+
+    public function withSelect(Request $request)
+    {
+        $argvs = $request->validate([
+            "column" => "required|string",
+            "selectEd" => "array",
+            "searchStr" => "string"
+        ]);
+
+        return rsps(ERR_SUCCESS);
     }
 
 }
