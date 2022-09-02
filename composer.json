@@ -10,7 +10,7 @@
   "license": "MIT",
   "autoload": {
     "psr-4": {
-      "leftsky\\": "src/"
+      "Leftsky\\LaravelHelp\\": "src/"
     },
     "files": [
       "src/helps.php"
