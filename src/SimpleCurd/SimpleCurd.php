@@ -11,14 +11,27 @@ use Doctrine\DBAL\Types\JsonType;
 use Doctrine\DBAL\Types\StringType;
 use Doctrine\DBAL\Types\TextType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 trait SimpleCurd
 {
-    private mixed $dbModel;
-    private array $columns = [];
-    private array $columnName = [];
+    // 【视情况可修改】修改时忽略的字段
     private array $noUpdate = ["id", "create_at", "updated_at", "deleted_at"];
+    // 【视情况可修改】自动采用like模糊匹配的字段
     private array $likeOpColumns = ["name", "title"];
+    // 【视情况可修改】关联时显示对方的字段，顺序优先。字段均不存在则显示ID
+    private array $withShowColumns = ["name", "nickname", "username", "title", "serial", "serial_number", "id"];
+
+    // 【内部使用】已校验的模型类
+    private mixed $dbModel;
+    // 【内部使用】需要关联的数组
+    private array $withs = [];
+    // 【内部使用】渲染的关联字段，可用于筛选
+    private array $withFields = [];
+    // 【内部使用】扫描列信息
+    private array $columns = [];
+    // 【内部使用】扫描列名列表
+    private array $columnName = [];
 
     /**
      * @throws \Exception
@@ -28,14 +41,64 @@ trait SimpleCurd
         if (!isset($this->model) || !class_exists($this->model))
             throw new \Exception();
         $this->dbModel = app($this->model);
-//        $this->dbModel = new YourModal();
-        $con = $this->dbModel->getConnection();
+        list(
+            $this->columns,
+            $this->columnName,
+            $this->withs,
+            $this->withFields
+            ) = self::decodeTableColumns($this->model, true, true, $this->withShowColumns);
+    }
+
+    public static function decodeTableColumns(
+        string $model,
+        bool   $fullInfo = false,
+        bool   $takeWith = null,
+        array  $withShowColumns = [],
+        string $modelNamespace = "App\\Models\\"
+    ): array
+    {
+        $cacheKey = "decodeTableColumns::" . $model;
+        if (Cache::has($cacheKey)) {
+            return json_decode(Cache::get($cacheKey), true);
+        }
+        if (!isset($model) || !class_exists($model))
+            throw new \Exception();
+        $dbModel = app($model);
+        $con = $dbModel->getConnection();
         $con->registerDoctrineType(EnumType::class, "enum", "enum");
         $table = $con->getDoctrineSchemaManager()
-            ->listTableDetails($this->dbModel->getTable());
-        $columns = $table->getColumns();
-        foreach ($columns as $key => $column) {
-            $this->columns [] = [
+            ->listTableDetails($dbModel->getTable());
+        foreach ($table->getColumns() as $key => $column) {
+            // 检索【belongsTo】关联字段，并加入with
+            if ($takeWith) {
+                $words = explode_or_empty($key);
+                unset($withName);
+                if ($key === "uid") {
+                    $withName = "user";
+                } else if (sizeof($words) > 1 && $words[sizeof($words) - 1] === "id") {
+                    $withName = substr($key, 0, strlen($key) - 3);
+                }
+                if (isset($withName)) {
+                    $withClass = $modelNamespace . camelize($withName);
+                    if (class_exists($withClass) &&
+                        method_exists($dbModel, $withName)) {
+                        $withs [] = $withName;
+                        list($no1, $ccs, $no3) = self::decodeTableColumns($withClass);
+                        unset($showWithColumn);
+                        foreach ($withShowColumns as $name) {
+                            if (in_array($name, $ccs)) {
+                                $showWithColumn = $name;
+                                break;
+                            }
+                        }
+                        if (isset($showWithColumn)) $withFileds [] = "$withName.$showWithColumn";
+                    } else {
+                        unset($withName);
+                    }
+                }
+            }
+            // 组合columns描述。如果无需全部信息则只取name
+            $columns [] = $fullInfo ? [
                 "name" => $key,
                 "required" => $column->getNotnull(),
                 "label" => $column->getComment() ?? match ($key) {
@@ -57,12 +120,21 @@ trait SimpleCurd
                 },
                 "length" => $column->getLength() ?? 0,
                 "valueList" => match ($column->getType()::class) {
-                    EnumType::class => $this->dbModel->enums[$key] ?? [],
+                    EnumType::class => $dbModel->enums[$key] ?? [],
                     default => []
-                }
-            ];
+                },
+                "withName" => $withName ?? null,
+                "showWithColumn" => $showWithColumn ?? "id"
+            ] : ["name" => $key];
         }
-        $this->columnName = array_column($this->columns, "name");
+        $data = [
+            $columns ?? [],
+            array_column($columns ?? [], "name"),
+            $withs ?? [],
+            $withFileds ?? []
+        ];
+        Cache::put($cacheKey, json_encode($data, JSON_UNESCAPED_UNICODE), 5 * 60);
+        return $data;
     }
 
     protected function columns()
@@ -92,9 +164,9 @@ trait SimpleCurd
             "orderByDesc" => "string",
         ];
         // 循环载入列名
-        foreach ($this->columnName as $item) {
+        foreach (array_merge($this->columnName, $this->withFields) as $item) {
             if (!in_array($item, $this->noUpdate))
-                $argvValidates[$item] = "nullable";
+                $argvValidates[str_replace(".", "\.", $item)] = "nullable";
         }
         // 从 request 中拉取需要的参数
         $argvs = $request->validate($argvValidates);
@@ -103,11 +175,21 @@ trait SimpleCurd
         $pageSize = $argvs["pageSize"] ?? 10;
 
         // 初始化模型
-        $list = $this->dbModel::with([]);
+        $list = $this->dbModel::with($this->withs);
         // 根据列名字段筛选匹配
         foreach ($this->columns as $column) {
             $this->getWhere($argvs[$column["name"]] ?? null, $column, $list);
             $this->getWhere($argvs["filter"][$column["name"]] ?? null, $column, $list);
+        }
+        // 关联模糊匹配
+        foreach ($this->withFields as $field) {
+            if ($argvs[$field] ?? null) {
+                $cValue = $argvs[$field];
+                list ($w, $c) = explode(".", $field);
+                $list->whereHas($w, function ($query) use ($c, $cValue) {
+                    $query->where($c, "like", "%$cValue%");
+                });
+            }
         }
 
         // 如果设置了排序字段
