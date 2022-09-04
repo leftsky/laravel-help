@@ -2,6 +2,7 @@
 
 // 成功
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Facades\Route;
 
 const ERR_SUCCESS = 0xFFFF0000;
 // 普通失败
@@ -250,5 +251,42 @@ if (!function_exists('try_url')) {
         } catch (GuzzleException $e) {
             return false;
         }
+    }
+}
+
+if (!function_exists('camelize')) {
+    /**
+     * 蛇形转驼峰
+     * step1.原字符串转小写,原字符串中的分隔符用空格替换,在字符串开头加上分隔符
+     * step2.将字符串中每个单词的首字母转换为大写,再去空格,去字符串首部附加的分隔符.
+     */
+    function camelize($uncamelized_words, $separator = '_')
+    {
+        $uncamelized_words = $separator . str_replace($separator, " ", strtolower($uncamelized_words));
+        return ltrim(str_replace(" ", "", ucwords($uncamelized_words)), $separator);
+    }
+}
+
+if (!function_exists('uncamelize')) {
+    /**
+     * 驼峰命名转蛇形命名
+     * 思路:
+     * 小写和大写紧挨一起的地方,加上分隔符,然后全部转小写
+     */
+    function uncamelize($camelCaps, $separator='_')
+    {
+        return strtolower(preg_replace('/([a-z])([A-Z])/', "$1" . $separator . "$2", $camelCaps));
+    }
+}
+
+if (!function_exists('route_simple_curd')) {
+    function route_simple_curd($class) {
+        Route::post("add", $class . "@add");
+        Route::post("get", $class . "@get");
+        Route::post("info", $class . "@info");
+        Route::post("modify", $class . "@modify");
+        Route::post("del", $class . "@del");
+        Route::post("withSelect", $class . "@withSelect");
+        Route::post("columns", $class . "@columns");
     }
 }

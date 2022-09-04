@@ -160,6 +160,11 @@ trait SimpleCurd
         }
     }
 
+    public function add(Request $request)
+    {
+        return rsps(ERR_SUCCESS);
+    }
+
     public function modify(Request $request)
     {
         $argvValidates = [
