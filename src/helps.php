@@ -290,6 +290,10 @@ if (!function_exists('uncamelize')) {
 }
 
 if (!function_exists('route_simple_curd')) {
+    /**
+     * 为一键CURD创建路由
+     * @param $class
+     */
     function route_simple_curd($class) {
         Route::post("add", $class . "@add");
         Route::post("get", $class . "@get");
@@ -300,3 +304,28 @@ if (!function_exists('route_simple_curd')) {
         Route::post("columns", $class . "@columns");
     }
 }
+
+
+if (!function_exists("cover_up_string")) {
+    /**
+     * 用覆盖符覆盖字符串的一部分
+     * @param string $string    字符串
+     * @param int $start        开始
+     * @param int $len          长度
+     * @param string $separator 覆盖符，默认是*
+     * @return string
+     */
+    function cover_up_string(string $string, int $start, int $len, string $separator = "*"): string
+    {
+        if (strlen($string) < $start + $len)
+            $len = strlen($string) - $start;
+        $str = substr($string, 0, $start);
+        $i = 0;
+        while ($i++ < $len) {
+            $str .= $separator;
+        }
+        $str .= substr($string, $start + $len);
+        return $str;
+    }
+}
+

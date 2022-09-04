@@ -12,6 +12,7 @@ use Doctrine\DBAL\Types\StringType;
 use Doctrine\DBAL\Types\TextType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 trait SimpleCurd
 {
@@ -57,7 +58,9 @@ trait SimpleCurd
         string $modelNamespace = "App\\Models\\"
     ): array
     {
-        $cacheKey = "decodeTableColumns::" . $model;
+        $id = DB::selectOne("SELECT MAX(id) as maxid FROM migrations");
+        $maxId = $id->maxid ?? 0;
+        $cacheKey = "decodeTableColumns:$maxId:" . $model;
         if (Cache::has($cacheKey)) {
             return json_decode(Cache::get($cacheKey), true);
         }
