@@ -47,15 +47,13 @@ trait SimpleCurd
             $this->columnName,
             $this->withs,
             $this->withFields
-            ) = self::decodeTableColumns($this->model, true, true, $this->withShowColumns);
+            ) = $this->decodeTableColumns($this->model, true, true);
     }
 
-    public static function decodeTableColumns(
+    private function decodeTableColumns(
         string $model,
         bool   $fullInfo = false,
-        bool   $takeWith = null,
-        array  $withShowColumns = [],
-        string $modelNamespace = "App\\Models\\"
+        bool   $takeWith = null
     ): array
     {
         $id = DB::selectOne("SELECT MAX(id) as maxid FROM migrations");
@@ -64,8 +62,7 @@ trait SimpleCurd
         if (Cache::has($cacheKey)) {
             return json_decode(Cache::get($cacheKey), true);
         }
-        if (!isset($model) || !class_exists($model))
-            throw new \Exception();
+        if (!isset($model) || !class_exists($model)) throw new \Exception();
         $dbModel = app($model);
         $con = $dbModel->getConnection();
         $con->registerDoctrineType(EnumType::class, "enum", "enum");
@@ -73,33 +70,7 @@ trait SimpleCurd
             ->listTableDetails($dbModel->getTable());
         foreach ($table->getColumns() as $key => $column) {
             // 检索【belongsTo】关联字段，并加入with
-            if ($takeWith) {
-                $words = explode_or_empty($key);
-                unset($withName);
-                if ($key === "uid") {
-                    $withName = "user";
-                } else if (sizeof($words) > 1 && $words[sizeof($words) - 1] === "id") {
-                    $withName = substr($key, 0, strlen($key) - 3);
-                }
-                if (isset($withName)) {
-                    $withClass = $modelNamespace . camelize($withName);
-                    if (class_exists($withClass) &&
-                        method_exists($dbModel, $withName)) {
-                        $withs [] = $withName;
-                        list($no1, $ccs, $no3) = self::decodeTableColumns($withClass);
-                        unset($showWithColumn);
-                        foreach ($withShowColumns as $name) {
-                            if (in_array($name, $ccs)) {
-                                $showWithColumn = $name;
-                                break;
-                            }
-                        }
-                        if (isset($showWithColumn)) $withFileds [] = "$withName.$showWithColumn";
-                    } else {
-                        unset($withName);
-                    }
-                }
-            }
+            if ($takeWith) list ($withName, $withClass, $withs) = $this->syncWithColumn($key);
             // 组合columns描述。如果无需全部信息则只取name
             $columns [] = $fullInfo ? [
                 "name" => $key,
@@ -136,8 +107,43 @@ trait SimpleCurd
             $withs ?? [],
             $withFileds ?? []
         ];
-        Cache::put($cacheKey, json_encode($data, JSON_UNESCAPED_UNICODE), 5 * 60);
+        Cache::put($cacheKey, json_encode($data, JSON_UNESCAPED_UNICODE), 24 * 60 * 60);
         return $data;
+    }
+
+    private function syncWithColumn($key): array
+    {
+        $modelNamespace = "App\\Models\\";
+        $words = explode_or_empty($key);
+        unset($withName);
+        if ($key === "uid") {
+            $withName = "user";
+        } else if (sizeof($words) > 1 && $words[sizeof($words) - 1] === "id") {
+            $withName = substr($key, 0, strlen($key) - 3);
+        }
+        if (isset($withName)) {
+            $withClass = $modelNamespace . camelize($withName);
+            if (class_exists($withClass) &&
+                method_exists($this->dbModel, $withName)) {
+                $withs [] = $withName;
+                list($no1, $ccs, $no3) = $this->decodeTableColumns($withClass);
+                unset($showWithColumn);
+                foreach ($this->withShowColumns as $name) {
+                    if (in_array($name, $ccs)) {
+                        $showWithColumn = $name;
+                        break;
+                    }
+                }
+                if (isset($showWithColumn)) $withFileds [] = "$withName.$showWithColumn";
+            } else {
+                unset($withName);
+            }
+        }
+        return [
+            $withName ?? null,
+            $withClass ?? null,
+            $withs ?? []
+        ];
     }
 
     protected function columns()
@@ -292,12 +298,22 @@ trait SimpleCurd
     public function withSelect(Request $request)
     {
         $argvs = $request->validate([
-            "column" => "required|string",
-            "selectEd" => "array",
-            "searchStr" => "string"
+            "columnName" => "required|string",
+            "withName" => "required|string",
+            "searchStr" => "nullable|string"
         ]);
+        $column = $argvs["withName"];
+        list ($withName, $withClass) = $this->syncWithColumn($argvs["columnName"]);
+        if ($withName && $withClass && class_exists($withClass)) {
+            $db = app($withClass);
+            $list = $db::when($argvs["searchStr"] ?? null,
+                function ($query) use ($column, $argvs) {
+                    $query->where($column, "like", "%{$argvs["searchStr"]}%");
+                })
+                ->select(["$column as text", "id"])->get();
+        }
 
-        return rsps(ERR_SUCCESS);
+        return rsps(ERR_SUCCESS, $list ?? []);
     }
 
 }
