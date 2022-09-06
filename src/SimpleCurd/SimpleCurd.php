@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 
 trait SimpleCurd
 {
+    // 【视情况可修改】模型命名空间
+    private string $modelNamespace = "App\\Models\\";
     // 【视情况可修改】修改时忽略的字段
     private array $noUpdate = ["id", "create_at", "updated_at", "deleted_at"];
     // 【视情况可修改】自动采用like模糊匹配的字段
@@ -70,7 +72,33 @@ trait SimpleCurd
             ->listTableDetails($dbModel->getTable());
         foreach ($table->getColumns() as $key => $column) {
             // 检索【belongsTo】关联字段，并加入with
-            if ($takeWith) list ($withName, $withClass, $withs) = $this->syncWithColumn($key);
+            if ($takeWith) {
+                $words = explode_or_empty($key);
+                unset($withName);
+                if ($key === "uid") {
+                    $withName = "user";
+                } else if (sizeof($words) > 1 && $words[sizeof($words) - 1] === "id") {
+                    $withName = substr($key, 0, strlen($key) - 3);
+                }
+                if (isset($withName)) {
+                    $withClass = $this->modelNamespace . camelize($withName);
+                    if (class_exists($withClass) &&
+                        method_exists($this->dbModel, $withName)) {
+                        $withs [] = $withName;
+                        list($no1, $ccs, $no3) = $this->decodeTableColumns($withClass);
+                        unset($showWithColumn);
+                        foreach ($this->withShowColumns as $name) {
+                            if (in_array($name, $ccs)) {
+                                $showWithColumn = $name;
+                                break;
+                            }
+                        }
+                        if (isset($showWithColumn)) $withFileds [] = "$withName.$showWithColumn";
+                    } else {
+                        unset($withName);
+                    }
+                }
+            }
             // 组合columns描述。如果无需全部信息则只取name
             $columns [] = $fullInfo ? [
                 "name" => $key,
@@ -111,38 +139,15 @@ trait SimpleCurd
         return $data;
     }
 
-    private function syncWithColumn($key): array
+    private function getWithName($key): array
     {
-        $modelNamespace = "App\\Models\\";
         $words = explode_or_empty($key);
-        unset($withName);
-        if ($key === "uid") {
-            $withName = "user";
-        } else if (sizeof($words) > 1 && $words[sizeof($words) - 1] === "id") {
+        if ($key === "uid") $withName = "user";
+        else if (sizeof($words) > 1 && $words[sizeof($words) - 1] === "id")
             $withName = substr($key, 0, strlen($key) - 3);
-        }
-        if (isset($withName)) {
-            $withClass = $modelNamespace . camelize($withName);
-            if (class_exists($withClass) &&
-                method_exists($this->dbModel, $withName)) {
-                $withs [] = $withName;
-                list($no1, $ccs, $no3) = $this->decodeTableColumns($withClass);
-                unset($showWithColumn);
-                foreach ($this->withShowColumns as $name) {
-                    if (in_array($name, $ccs)) {
-                        $showWithColumn = $name;
-                        break;
-                    }
-                }
-                if (isset($showWithColumn)) $withFileds [] = "$withName.$showWithColumn";
-            } else {
-                unset($withName);
-            }
-        }
         return [
             $withName ?? null,
-            $withClass ?? null,
-            $withs ?? []
+            isset($withName) ? $this->modelNamespace . camelize($withName) : null,
         ];
     }
 
@@ -303,7 +308,7 @@ trait SimpleCurd
             "searchStr" => "nullable|string"
         ]);
         $column = $argvs["withName"];
-        list ($withName, $withClass) = $this->syncWithColumn($argvs["columnName"]);
+        list ($withName, $withClass) = $this->getWithName($argvs["columnName"]);
         if ($withName && $withClass && class_exists($withClass)) {
             $db = app($withClass);
             $list = $db::when($argvs["searchStr"] ?? null,
