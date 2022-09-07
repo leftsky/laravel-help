@@ -28,6 +28,8 @@ trait SimpleCurd
 
     // 【内部使用】已校验的模型类
     private mixed $dbModel;
+    // 【内部使用】是否已初始化
+    private bool $inited = false;
     // 【内部使用】需要关联的数组
     private array $withs = [];
     // 【内部使用】渲染的关联字段，可用于筛选
@@ -40,7 +42,7 @@ trait SimpleCurd
     /**
      * @throws \Exception
      */
-    public function __construct()
+    private function init()
     {
         if (!isset($this->model) || !class_exists($this->model))
             throw new \Exception();
@@ -51,6 +53,7 @@ trait SimpleCurd
             $this->withs,
             $this->withFields
             ) = $this->decodeTableColumns($this->model, true, true);
+        $this->inited = true;
     }
 
     private function decodeTableColumns(
@@ -155,8 +158,9 @@ trait SimpleCurd
         return rsps(ERR_SUCCESS, $this->columns);
     }
 
-    protected function get(Request $request)
+    public function get(Request $request)
     {
+        !$this->inited && $this->init();
         $argvValidates = [
             // 指定ID
             "id" => "nullable|integer",
@@ -257,11 +261,23 @@ trait SimpleCurd
 
     public function add(Request $request)
     {
-        return rsps(ERR_SUCCESS);
+        !$this->inited && $this->init();
+        $argvValidates = [];
+        // 循环载入列名
+        foreach ($this->columnName as $item) {
+            if (!in_array($item, $this->noUpdate))
+                $argvValidates[$item] = "nullable";
+        }
+        $argvs = $request->validate($argvValidates);
+        $item = new $this->dbModel();
+        foreach ($argvs as $key => $value) $item->{$key} = $value;
+        $item->save();
+        return rsps(ERR_SUCCESS, $item);
     }
 
     public function modify(Request $request)
     {
+        !$this->inited && $this->init();
         $argvValidates = [
             "id" => "required|integer"
         ];
@@ -284,6 +300,7 @@ trait SimpleCurd
 
     public function info(Request $request)
     {
+        !$this->inited && $this->init();
         $argvs = $request->validate([
             "id" => "required|integer"
         ]);
@@ -292,6 +309,7 @@ trait SimpleCurd
 
     public function del(Request $request)
     {
+        !$this->inited && $this->init();
         $argvs = $request->validate([
             "id" => "required|integer"
         ]);
@@ -301,6 +319,7 @@ trait SimpleCurd
 
     public function withSelect(Request $request)
     {
+        !$this->inited && $this->init();
         $argvs = $request->validate([
             "columnName" => "required|string",
             "withName" => "required|string",
