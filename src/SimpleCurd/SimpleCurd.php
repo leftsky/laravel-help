@@ -153,8 +153,9 @@ trait SimpleCurd
         ];
     }
 
-    protected function columns()
+    public function columns()
     {
+        !$this->inited && $this->init();
         return rsps(ERR_SUCCESS, $this->columns);
     }
 
