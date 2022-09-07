@@ -23,7 +23,8 @@ trait SimpleCurd
     // 【视情况可修改】自动采用like模糊匹配的字段
     private array $likeOpColumns = ["name", "title"];
     // 【视情况可修改】关联时显示对方的字段，顺序优先。字段均不存在则显示ID
-    private array $withShowColumns = ["name", "nickname", "username", "title", "serial", "serial_number", "id"];
+    private array $withShowColumns = ["name", "nickname", "username", "title",
+        "serial", "serial_number", "code", "id"];
 
     // 【内部使用】已校验的模型类
     private mixed $dbModel;
@@ -65,23 +66,16 @@ trait SimpleCurd
             return json_decode(Cache::get($cacheKey), true);
         }
         if (!isset($model) || !class_exists($model)) throw new \Exception();
-        $dbModel = app($model);
-        $con = $dbModel->getConnection();
+        $curOrm = app($model);
+        $con = $curOrm->getConnection();
         $con->registerDoctrineType(EnumType::class, "enum", "enum");
         $table = $con->getDoctrineSchemaManager()
-            ->listTableDetails($dbModel->getTable());
+            ->listTableDetails($curOrm->getTable());
         foreach ($table->getColumns() as $key => $column) {
             // 检索【belongsTo】关联字段，并加入with
             if ($takeWith) {
-                $words = explode_or_empty($key);
-                unset($withName);
-                if ($key === "uid") {
-                    $withName = "user";
-                } else if (sizeof($words) > 1 && $words[sizeof($words) - 1] === "id") {
-                    $withName = substr($key, 0, strlen($key) - 3);
-                }
+                list($withName, $withClass) = $this->getWithName($key);
                 if (isset($withName)) {
-                    $withClass = $this->modelNamespace . camelize($withName);
                     if (class_exists($withClass) &&
                         method_exists($this->dbModel, $withName)) {
                         $withs [] = $withName;
@@ -122,7 +116,7 @@ trait SimpleCurd
                 },
                 "length" => $column->getLength() ?? 0,
                 "valueList" => match ($column->getType()::class) {
-                    EnumType::class => $dbModel->enums[$key] ?? [],
+                    EnumType::class => $curOrm->enums[$key] ?? [],
                     default => []
                 },
                 "withName" => $withName ?? null,
@@ -141,13 +135,18 @@ trait SimpleCurd
 
     private function getWithName($key): array
     {
-        $words = explode_or_empty($key);
-        if ($key === "uid") $withName = "user";
-        else if (sizeof($words) > 1 && $words[sizeof($words) - 1] === "id")
+//        if (isset($this->dbModel->spWith) && isset($this->dbModel->spWith[$key]))
+//            return $this->dbModel->spWith[$key];
+        $words = explode("_", $key);
+        if ($key === "uid") {
+            $withName = "user";
+        } else if (sizeof($words) > 1 && $words[sizeof($words) - 1] === "id") {
+            // 检测后缀为 _id 的字段，去除并规则匹配 with 和 class
             $withName = substr($key, 0, strlen($key) - 3);
+        }
         return [
             $withName ?? null,
-            isset($withName) ? $this->modelNamespace . camelize($withName) : null,
+            isset($withName) ? $this->modelNamespace . camelize($withName) : null
         ];
     }
 
