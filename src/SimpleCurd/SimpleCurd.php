@@ -334,7 +334,10 @@ trait SimpleCurd
                 function ($query) use ($column, $argvs) {
                     $query->where($column, "like", "%{$argvs["searchStr"]}%");
                 })
-                ->select(["$column as text", "id"])->get();
+                ->select(["$column as text", "id"])
+                // 防止记录过多引起内存超限，这里仅检索前100条记录
+                ->limit(100)
+                ->get();
         }
 
         return rsps(ERR_SUCCESS, $list ?? []);
