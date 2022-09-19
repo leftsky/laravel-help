@@ -303,9 +303,13 @@ trait SimpleCurd
     {
         !$this->inited && $this->init();
         $argvs = $request->validate([
-            "id" => "required|integer"
+            "id" => "required|integer",
+            "appends" => "array",
+            "with" => "array"
         ]);
-        return rsps(ERR_SUCCESS, $this->dbModel::find($argvs["id"]));
+        return rsps(ERR_SUCCESS, $this->dbModel::with($argvs["with"] ?? [])
+            ->find($argvs["id"])
+            ->append($argvs["appends"] ?? []));
     }
 
     public function del(Request $request)
