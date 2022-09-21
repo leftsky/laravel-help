@@ -180,6 +180,8 @@ trait SimpleCurd
             "sort" => "array",
             "orderBy" => "string",
             "orderByDesc" => "string",
+            "appends" => "array",
+            "with" => "array"
         ];
         // 循环载入列名
         foreach (array_merge($this->columnName, $this->withFields) as $item) {
@@ -193,7 +195,7 @@ trait SimpleCurd
         $pageSize = $argvs["pageSize"] ?? 10;
 
         // 初始化模型
-        $list = $this->dbModel::with($this->withs);
+        $list = $this->dbModel::with(array_merge($this->withs, $argvs["with"] ?? []));
         // 根据列名字段筛选匹配
         foreach ($this->columns as $column) {
             $this->getWhere($argvs[$column["name"]] ?? null, $column, $list);
@@ -229,7 +231,7 @@ trait SimpleCurd
 
         return rsps(ERR_SUCCESS, [
             "total" => $list->count(),
-            "data" => $list->forPage($page, $pageSize)->get(),
+            "data" => $list->forPage($page, $pageSize)->get()->append($argvs["appends"] ?? []),
             "current" => $page
         ]);
     }
