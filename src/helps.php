@@ -240,6 +240,22 @@ if (!function_exists("fix_img")) {
     }
 }
 
+if (!function_exists("fix_article")) {
+    function fix_article(string $value, string $search): string
+    {
+        if (strstr($value, "http")) return $value;
+        if ($value == "") return config("app.default.image");
+        $domain = config("app.imgDomain");
+        if (!$domain) {
+            if (isset($_SERVER['SERVER_PORT']) && isset($_SERVER['HTTP_HOST']))
+                $domain = ((int)$_SERVER['SERVER_PORT'] === 80
+                        ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'];
+            else $domain = config("domain");
+        }
+        return str_replace($search, $domain . $search, $value);
+    }
+}
+
 if (!function_exists('try_url')) {
     function try_url(string $url): bool
     {
