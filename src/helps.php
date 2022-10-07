@@ -317,6 +317,7 @@ if (!function_exists('route_simple_curd')) {
         Route::post("modify", $class . "@modify");
         Route::post("del", $class . "@del");
         Route::post("withSelect", $class . "@withSelect");
+        Route::post("enums", $class . "@enums");
         Route::post("columns", $class . "@columns");
     }
 }

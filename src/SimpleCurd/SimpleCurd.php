@@ -10,6 +10,7 @@ use Doctrine\DBAL\Types\IntegerType;
 use Doctrine\DBAL\Types\JsonType;
 use Doctrine\DBAL\Types\StringType;
 use Doctrine\DBAL\Types\TextType;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,8 @@ trait SimpleCurd
     // 【视情况可修改】关联时显示对方的字段，顺序优先。字段均不存在则显示ID
     private array $withShowColumns = ["name", "nickname", "username", "title",
         "serial", "serial_number", "code", "id"];
+    // searchStr 的模糊搜索字段
+    private array $searchColumns = ["title", "btitle", "content", "description"];
 
     // 【内部使用】已校验的模型类
     private mixed $dbModel;
@@ -40,12 +43,13 @@ trait SimpleCurd
     private array $columnName = [];
 
     /**
-     * @throws \Exception
+     * 初始化；检测表类是否存在，扫描拉取列信息
+     * @throws Exception
      */
     private function init()
     {
         if (!isset($this->model) || !class_exists($this->model))
-            throw new \Exception();
+            throw new Exception();
         $this->dbModel = app($this->model);
         list(
             $this->columns,
@@ -56,19 +60,31 @@ trait SimpleCurd
         $this->inited = true;
     }
 
+    /**
+     * 扫描列信息
+     * @param string $model // 模型类
+     * @param bool $fullInfo // 是否是完整信息；组合columns描述。如果无需全部信息则只取name
+     * @param bool|null $takeWith // 是否扫描with信息
+     * @param bool $useCache // 是否可以使用缓存
+     * @return array
+     * @throws Exception
+     */
     private function decodeTableColumns(
         string $model,
         bool   $fullInfo = false,
-        bool   $takeWith = null
+        bool   $takeWith = null,
+        bool   $useCache = true
     ): array
     {
+        // 获得 migrations 中id最高的记录值，用此做列信息缓存的 key 值
         $id = DB::selectOne("SELECT MAX(id) as maxid FROM migrations");
         $maxId = $id->maxid ?? 0;
         $cacheKey = "decodeTableColumns:$maxId:" . $model;
-        if (Cache::has($cacheKey)) {
+        // 如果存在缓存则标志可以使用缓存，则从缓存中拉取列信息
+        if (Cache::has($cacheKey) && $useCache) {
             return json_decode(Cache::get($cacheKey), true);
         }
-        if (!isset($model) || !class_exists($model)) throw new \Exception();
+        if (!isset($model) || !class_exists($model)) throw new Exception();
         $curOrm = app($model);
         $con = $curOrm->getConnection();
         $con->registerDoctrineType(EnumType::class, "enum", "enum");
@@ -136,10 +152,13 @@ trait SimpleCurd
         return $data;
     }
 
+    /**
+     * 从 column 获得 with 的类
+     * @param $key
+     * @return array
+     */
     private function getWithName($key): array
     {
-//        if (isset($this->dbModel->spWith) && isset($this->dbModel->spWith[$key]))
-//            return $this->dbModel->spWith[$key];
         $words = explode("_", $key);
         if ($key === "uid") {
             $withName = "user";
@@ -153,12 +172,36 @@ trait SimpleCurd
         ];
     }
 
-    public function columns()
+    /**
+     * 获得模型的 enums 信息
+     * @param Request $request
+     * @return mixed
+     * @throws Exception
+     */
+    public function enums(Request $request)
+    {
+        !$this->inited && $this->init();
+        return rsps(ERR_SUCCESS, $this->dbModel->enums);
+    }
+
+    /**
+     * 获得扫描后的列信息
+     * @param Request $request
+     * @return mixed
+     * @throws Exception
+     */
+    public function columns(Request $request)
     {
         !$this->inited && $this->init();
         return rsps(ERR_SUCCESS, $this->columns);
     }
 
+    /**
+     * 分页查询记录
+     * @param Request $request
+     * @return mixed
+     * @throws Exception
+     */
     public function get(Request $request)
     {
         !$this->inited && $this->init();
@@ -262,6 +305,12 @@ trait SimpleCurd
         }
     }
 
+    /**
+     * 增加记录
+     * @param Request $request
+     * @return mixed
+     * @throws Exception
+     */
     public function add(Request $request)
     {
         !$this->inited && $this->init();
@@ -278,6 +327,12 @@ trait SimpleCurd
         return rsps(ERR_SUCCESS, $item);
     }
 
+    /**
+     * 修改记录
+     * @param Request $request
+     * @return mixed
+     * @throws Exception
+     */
     public function modify(Request $request)
     {
         !$this->inited && $this->init();
@@ -301,6 +356,12 @@ trait SimpleCurd
         return rsps(ERR_SUCCESS, $item);
     }
 
+    /**
+     * 根据 id 拉取记录信息
+     * @param Request $request
+     * @return mixed
+     * @throws Exception
+     */
     public function info(Request $request)
     {
         !$this->inited && $this->init();
@@ -314,6 +375,12 @@ trait SimpleCurd
             ->append($argvs["appends"] ?? []));
     }
 
+    /**
+     * 删除记录值
+     * @param Request $request
+     * @return mixed
+     * @throws Exception
+     */
     public function del(Request $request)
     {
         !$this->inited && $this->init();
@@ -324,6 +391,12 @@ trait SimpleCurd
         return rsps(ERR_SUCCESS);
     }
 
+    /**
+     * 关联字段的查询
+     * @param Request $request
+     * @return mixed
+     * @throws Exception
+     */
     public function withSelect(Request $request)
     {
         !$this->inited && $this->init();
