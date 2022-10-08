@@ -12,6 +12,7 @@ use Doctrine\DBAL\Types\StringType;
 use Doctrine\DBAL\Types\TextType;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -322,7 +323,15 @@ trait SimpleCurd
         }
         $argvs = $request->validate($argvValidates);
         $item = new $this->dbModel();
-        foreach ($argvs as $key => $value) $item->{$key} = $value;
+        foreach ($argvs as $key => $value) {
+            // 安全措施，UID拒绝从参数中拉取赋值
+            $uidKey = $this->dbModel->uidKey ?? "uid";
+            if ($key !== $uidKey) {         // 如果与用户ID列名不相等，则可以赋值
+                $item->{$key} = $value;
+            } else if ($value == true) {    // 如果列名相等且值为true，则赋值当前登录的用户
+                $item->{$key} = Auth::check() ? null : Auth::id();
+            }
+        }
         $item->save();
         return rsps(ERR_SUCCESS, $item);
     }
