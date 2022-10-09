@@ -8,6 +8,7 @@ use Doctrine\DBAL\Types\DateTimeType;
 use Doctrine\DBAL\Types\DateType;
 use Doctrine\DBAL\Types\IntegerType;
 use Doctrine\DBAL\Types\JsonType;
+use Doctrine\DBAL\Types\SmallIntType;
 use Doctrine\DBAL\Types\StringType;
 use Doctrine\DBAL\Types\TextType;
 use Exception;
@@ -124,7 +125,7 @@ trait SimpleCurd
                         default => $key
                     },
                 "type" => match ($column->getType()::class) {
-                    IntegerType::class, BigIntType::class => "integer",
+                    IntegerType::class, SmallIntType::class, BigIntType::class => "integer",
                     BooleanType::class => "boolean",
                     JsonType::class => "json",
                     TextType::class => "text",
@@ -329,7 +330,7 @@ trait SimpleCurd
             if ($key !== $uidKey) {         // 如果与用户ID列名不相等，则可以赋值
                 $item->{$key} = $value;
             } else if ($value == true) {    // 如果列名相等且值为true，则赋值当前登录的用户
-                $item->{$key} = Auth::check() ? null : Auth::id();
+                $item->{$key} = Auth::check() ? Auth::id() : null;
             }
         }
         $item->save();
