@@ -2,20 +2,9 @@
 
 namespace Leftsky\LaravelHelp\SimpleCurd;
 
-use Doctrine\DBAL\Types\BigIntType;
-use Doctrine\DBAL\Types\BooleanType;
-use Doctrine\DBAL\Types\DateTimeType;
-use Doctrine\DBAL\Types\DateType;
-use Doctrine\DBAL\Types\IntegerType;
-use Doctrine\DBAL\Types\JsonType;
-use Doctrine\DBAL\Types\SmallIntType;
-use Doctrine\DBAL\Types\StringType;
-use Doctrine\DBAL\Types\TextType;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 trait SimpleCurd
 {
@@ -25,9 +14,6 @@ trait SimpleCurd
     private array $noUpdate = ["id", "create_at", "updated_at", "deleted_at"];
     // 【视情况可修改】自动采用like模糊匹配的字段
     private array $likeOpColumns = ["name", "title"];
-    // 【视情况可修改】关联时显示对方的字段，顺序优先。字段均不存在则显示ID
-    private array $withShowColumns = ["name", "nickname", "username", "title",
-        "serial", "serial_number", "code", "id"];
     // searchStr 的模糊搜索字段
     private array $searchColumns = ["title", "btitle", "content", "description"];
 
@@ -58,121 +44,10 @@ trait SimpleCurd
             $this->columnName,
             $this->withs,
             $this->withFields
-            ) = $this->decodeTableColumns($this->model, true, true);
+            ) = ParseTable::decodeTableColumns($this->model);
         $this->inited = true;
     }
 
-    /**
-     * 扫描列信息
-     * @param string $model // 模型类
-     * @param bool $fullInfo // 是否是完整信息；组合columns描述。如果无需全部信息则只取name
-     * @param bool|null $takeWith // 是否扫描with信息
-     * @param bool $useCache // 是否可以使用缓存
-     * @return array
-     * @throws Exception
-     */
-    private function decodeTableColumns(
-        string $model,
-        bool   $fullInfo = false,
-        bool   $takeWith = null,
-        bool   $useCache = true
-    ): array
-    {
-        // 获得 migrations 中id最高的记录值，用此做列信息缓存的 key 值
-        $id = DB::selectOne("SELECT MAX(id) as maxid FROM migrations");
-        $maxId = $id->maxid ?? 0;
-        $cacheKey = "decodeTableColumns:$maxId:" . $model;
-        // 如果存在缓存则标志可以使用缓存，则从缓存中拉取列信息
-        if (Cache::has($cacheKey) && $useCache) {
-            return json_decode(Cache::get($cacheKey), true);
-        }
-        if (!isset($model) || !class_exists($model)) throw new Exception();
-        $curOrm = app($model);
-        $con = $curOrm->getConnection();
-        $con->registerDoctrineType(EnumType::class, "enum", "enum");
-        $table = $con->getDoctrineSchemaManager()
-            ->listTableDetails($curOrm->getTable());
-        foreach ($table->getColumns() as $key => $column) {
-            // 检索【belongsTo】关联字段，并加入with
-            if ($takeWith) {
-                list($withName, $withClass) = $this->getWithName($key);
-                if (isset($withName)) {
-                    if (class_exists($withClass) &&
-                        method_exists($this->dbModel, $withName)) {
-                        $withs [] = $withName;
-                        list($no1, $ccs, $no3) = $this->decodeTableColumns($withClass);
-                        unset($showWithColumn);
-                        foreach ($this->withShowColumns as $name) {
-                            if (in_array($name, $ccs)) {
-                                $showWithColumn = $name;
-                                break;
-                            }
-                        }
-                        if (isset($showWithColumn)) $withFileds [] = "$withName.$showWithColumn";
-                    } else {
-                        unset($withName);
-                    }
-                }
-            }
-            // 组合columns描述。如果无需全部信息则只取name
-            $columns [] = $fullInfo ? [
-                "name" => $key,
-                "required" => $column->getNotnull(),
-                "label" => $column->getComment() ?? match ($key) {
-                        "created_at" => "创建时间",
-                        "updated_at" => "更新时间",
-                        "deleted_at" => "删除时间",
-                        default => $key
-                    },
-                "type" => match ($column->getType()::class) {
-                    IntegerType::class, SmallIntType::class, BigIntType::class => "integer",
-                    BooleanType::class => "boolean",
-                    JsonType::class => "json",
-                    TextType::class => "text",
-                    StringType::class => "string",
-                    DateTimeType::class => "datetime",
-                    DateType::class => "date",
-                    EnumType::class => "enum",
-                    default => null
-                },
-                "length" => $column->getLength() ?? 0,
-                "valueList" => match ($column->getType()::class) {
-                    EnumType::class => $curOrm->enums[$key] ?? [],
-                    default => []
-                },
-                "withName" => $withName ?? null,
-                "showWithColumn" => $showWithColumn ?? "id"
-            ] : ["name" => $key];
-        }
-        $data = [
-            $columns ?? [],
-            array_column($columns ?? [], "name"),
-            $withs ?? [],
-            $withFileds ?? []
-        ];
-        Cache::put($cacheKey, json_encode($data, JSON_UNESCAPED_UNICODE), 24 * 60 * 60);
-        return $data;
-    }
-
-    /**
-     * 从 column 获得 with 的类
-     * @param $key
-     * @return array
-     */
-    private function getWithName($key): array
-    {
-        $words = explode("_", $key);
-        if ($key === "uid") {
-            $withName = "user";
-        } else if (sizeof($words) > 1 && $words[sizeof($words) - 1] === "id") {
-            // 检测后缀为 _id 的字段，去除并规则匹配 with 和 class
-            $withName = substr($key, 0, strlen($key) - 3);
-        }
-        return [
-            $withName ?? null,
-            isset($withName) ? $this->modelNamespace . camelize($withName) : null
-        ];
-    }
 
     /**
      * 获得模型的 enums 信息
@@ -416,7 +291,7 @@ trait SimpleCurd
             "searchStr" => "nullable|string"
         ]);
         $column = $argvs["withName"];
-        list ($withName, $withClass) = $this->getWithName($argvs["columnName"]);
+        list ($withName, $withClass) = ParseTable::getWithName($argvs["columnName"]);
         if ($withName && $withClass && class_exists($withClass)) {
             $db = app($withClass);
             $list = $db::when($argvs["searchStr"] ?? null,
