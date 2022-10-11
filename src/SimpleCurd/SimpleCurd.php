@@ -159,16 +159,16 @@ trait SimpleCurd
     private function getWhere(mixed $cValue, $column, $list)
     {
         if ($cValue === null) return;
-        $cValue = match ($column["type"]) {
-            "boolean" => in_array(strtolower($cValue), [1, "true"]),
-            "integer" => intval($cValue),
-            default => $cValue
-        };
         switch (gettype($cValue)) {
             case "NULL":
                 break;
             case "boolean":
             case "integer":
+                $cValue = match ($column["type"]) {
+                    "boolean" => in_array(strtolower($cValue), [1, "true"]),
+                    "integer" => intval($cValue),
+                    default => $cValue
+                };
                 $list->where($column["name"], $cValue);
                 break;
             case "string":
@@ -255,9 +255,10 @@ trait SimpleCurd
             "appends" => "array",
             "with" => "array"
         ]);
-        return rsps(ERR_SUCCESS, $this->dbModel::with($argvs["with"] ?? [])
-            ->find($argvs["id"])
-            ->append($argvs["appends"] ?? []));
+        return rsps(ERR_SUCCESS,
+            $this->dbModel::with(array_merge($this->withs, $argvs["with"] ?? []))
+                ->find($argvs["id"])
+                ->append($argvs["appends"] ?? []));
     }
 
     /**
