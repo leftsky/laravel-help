@@ -20,6 +20,8 @@ class ParseTable
     // 【视情况可修改】关联时显示对方的字段，顺序优先。字段均不存在则显示ID
     private static array $withShowColumns = ["name", "nickname", "username", "title",
         "serial", "serial_number", "code", "id"];
+    // 缓存生存时间
+    private static int $cacheAliveTime = 24 * 60 * 60;
 
     /**
      * 获得 当前表 的缓存key值
@@ -28,7 +30,7 @@ class ParseTable
     {
         $id = DB::selectOne("SELECT MAX(id) as maxid FROM migrations");
         $maxId = $id->maxid ?? 0;
-        return "decodeTableColumns:$maxId:" . $model;
+        return "leftsky_SimpleCurdTableColumnsCache:$maxId:" . $model;
     }
 
     /**
@@ -42,8 +44,7 @@ class ParseTable
      * @return array
      * @throws Exception
      */
-    public
-    static function decodeTableColumns(
+    public static function decodeTableColumns(
         string $model,
         string $baseModel = null,
         array  $options = [
@@ -124,7 +125,10 @@ class ParseTable
             $withs ?? [],
             $withFileds ?? []
         ];
-        Cache::put($cacheKey, json_encode($data, JSON_UNESCAPED_UNICODE), 24 * 60 * 60);
+        if ($options["fullInfo"] && $options["takeWith"] && $options["useCache"]) {
+            Cache::put($cacheKey, json_encode($data, JSON_UNESCAPED_UNICODE),
+                self::$cacheAliveTime);
+        }
         return $data;
     }
 
@@ -134,8 +138,7 @@ class ParseTable
      * @param string $modelNamespace // 模型ROM所处的命名空间
      * @return array
      */
-    public
-    static function getWithName($key, $modelNamespace = "App\\Models\\"): array
+    public static function getWithName($key, $modelNamespace = "App\\Models\\"): array
     {
         $words = explode("_", $key);
         if ($key === "uid") {
