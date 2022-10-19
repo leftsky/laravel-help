@@ -63,6 +63,7 @@ class ParseTable
         $curOrm = app($model);
         $con = $curOrm->getConnection();
         $con->registerDoctrineType(EnumType::class, "enum", "enum");
+        $con->registerDoctrineType(SetType::class, "set", "set");
         $table = $con->getDoctrineSchemaManager()
             ->listTableDetails($curOrm->getTable());
         foreach ($table->getColumns() as $key => $column) {
@@ -108,11 +109,12 @@ class ParseTable
                     DateTimeType::class => "datetime",
                     DateType::class => "date",
                     EnumType::class => "enum",
+                    SetType::class => "set",
                     default => null
                 },
                 "length" => $column->getLength() ?? 0,
                 "valueList" => match ($column->getType()::class) {
-                    EnumType::class => $curOrm->enums[$key] ?? [],
+                    EnumType::class, SetType::class => $curOrm->enums[$key] ?? [],
                     default => []
                 },
                 "withName" => $withName ?? null,
