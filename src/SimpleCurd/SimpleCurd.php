@@ -55,7 +55,7 @@ trait SimpleCurd
      * @return mixed
      * @throws Exception
      */
-    public function enums(Request $request)
+    public function enums()
     {
         !$this->inited && $this->init();
         return rsps(ERR_SUCCESS, $this->dbModel->enums);
@@ -67,7 +67,7 @@ trait SimpleCurd
      * @return mixed
      * @throws Exception
      */
-    public function columns(Request $request)
+    public function columns()
     {
         !$this->inited && $this->init();
         return rsps(ERR_SUCCESS, $this->columns);
@@ -79,7 +79,7 @@ trait SimpleCurd
      * @return mixed
      * @throws Exception
      */
-    public function get(Request $request)
+    protected function get_()
     {
         !$this->inited && $this->init();
         $argvValidates = [
@@ -109,7 +109,7 @@ trait SimpleCurd
                 $argvValidates[str_replace(".", "\.", $item)] = "nullable";
         }
         // 从 request 中拉取需要的参数
-        $argvs = $request->validate($argvValidates);
+        $argvs = request()->validate($argvValidates);
         // 渲染分页字段
         $page = $argvs["page"] ?? ($argvs["current"] ?? 1);
         $pageSize = $argvs["pageSize"] ?? 10;
@@ -188,7 +188,7 @@ trait SimpleCurd
      * @return mixed
      * @throws Exception
      */
-    public function add(Request $request)
+    protected function add_()
     {
         !$this->inited && $this->init();
         $argvValidates = [];
@@ -197,7 +197,7 @@ trait SimpleCurd
             if (!in_array($item, $this->noUpdate))
                 $argvValidates[$item] = "nullable";
         }
-        $argvs = $request->validate($argvValidates);
+        $argvs = request()->validate($argvValidates);
         $item = new $this->dbModel();
         foreach ($argvs as $key => $value) {
             // 安全措施，UID拒绝从参数中拉取赋值
@@ -218,7 +218,7 @@ trait SimpleCurd
      * @return mixed
      * @throws Exception
      */
-    public function modify(Request $request)
+    protected function modify_()
     {
         !$this->inited && $this->init();
         $argvValidates = [
@@ -229,7 +229,7 @@ trait SimpleCurd
             if (!in_array($item, $this->noUpdate))
                 $argvValidates[$item] = "nullable";
         }
-        $argvs = $request->validate($argvValidates);
+        $argvs = request()->validate($argvValidates);
         if (!$item = $this->dbModel::find($argvs["id"])) {
             return rsps(ERR_FAILED, null, "查询不到记录");
         }
@@ -247,10 +247,10 @@ trait SimpleCurd
      * @return mixed
      * @throws Exception
      */
-    public function info(Request $request)
+    protected function info_()
     {
         !$this->inited && $this->init();
-        $argvs = $request->validate([
+        $argvs = request()->validate([
             "id" => "required|integer",
             "appends" => "array",
             "with" => "array"
@@ -267,10 +267,10 @@ trait SimpleCurd
      * @return mixed
      * @throws Exception
      */
-    public function del(Request $request)
+    protected function del_()
     {
         !$this->inited && $this->init();
-        $argvs = $request->validate([
+        $argvs = request()->validate([
             "id" => "required|integer"
         ]);
         $this->dbModel::where("id", $argvs["id"])->delete();
@@ -283,10 +283,10 @@ trait SimpleCurd
      * @return mixed
      * @throws Exception
      */
-    public function withSelect(Request $request)
+    public function withSelect()
     {
         !$this->inited && $this->init();
-        $argvs = $request->validate([
+        $argvs = request()->validate([
             "columnName" => "required|string",
             "withName" => "required|string",
             "searchStr" => "nullable|string"
@@ -306,6 +306,18 @@ trait SimpleCurd
         }
 
         return rsps(ERR_SUCCESS, $list ?? []);
+    }
+
+    public function __call(string $name, array $arguments)
+    {
+        return match ($name) {
+            "get" => $this->get_(),
+            "add" => $this->add_(),
+            "info" => $this->info_(),
+            "modify" => $this->modify_(),
+            "del" => $this->del_(),
+            default => rsps(ERR_FAILED, null, "404"),
+        };
     }
 
 }
