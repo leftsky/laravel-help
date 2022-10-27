@@ -308,15 +308,20 @@ trait SimpleCurd
         return rsps(ERR_SUCCESS, $list ?? []);
     }
 
-    public function __call(string $name, array $arguments)
+    public function page404()
     {
-        return match ($name) {
+        return rsps(ERR_FAILED, null, "404");
+    }
+
+    public function __call($method, $parameters)
+    {
+        return match ($method) {
             "get" => $this->get_(),
             "add" => $this->add_(),
             "info" => $this->info_(),
             "modify" => $this->modify_(),
             "del" => $this->del_(),
-            default => rsps(ERR_FAILED, null, "404"),
+            default => $this->page404()
         };
     }
 
