@@ -398,3 +398,16 @@ if (!function_exists("cover_up_string")) {
     }
 }
 
+if (!function_exists("has_chinese_words")) {
+    /**
+     * 判断字符串中是否存在中文字符
+     * @param string $str
+     * @return bool
+     */
+    function has_chinese_words(string $str): bool
+    {
+        return preg_replace("/[^\x{4E00}-\x{9FFF}]+/u",
+                '', $str) != "";
+    }
+}
+
