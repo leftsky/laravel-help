@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a0617c79a35837bdce4a98304f614847",
+    "content-hash": "b2d3c5878193a98f9f22b065c5182dc9",
     "packages": [
         {
             "name": "aliyuncs/oss-sdk-php",
@@ -1988,6 +1988,56 @@
                 }
             ],
             "time": "2022-04-17T13:12:02+00:00"
+        },
+        {
+            "name": "leftsky/php-help",
+            "version": "0.0.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/leftsky/php-help.git",
+                "reference": "b296c71beb631f03f6b84c4a03228c7e5eb650b1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/leftsky/php-help/zipball/b296c71beb631f03f6b84c4a03228c7e5eb650b1",
+                "reference": "b296c71beb631f03f6b84c4a03228c7e5eb650b1",
+                "shasum": "",
+                "mirrors": [
+                    {
+                        "url": "https://mirrors.aliyun.com/composer/dists/%package%/%reference%.%type%",
+                        "preferred": true
+                    }
+                ]
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^7.3|^8.0"
+            },
+            "type": "library",
+            "autoload": {
+                "files": [
+                    "src/helps.php"
+                ],
+                "psr-4": {
+                    "Leftsky\\LaravelHelp\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "leftsky",
+                    "email": "leftsky@vip.qq.com"
+                }
+            ],
+            "description": "PHP帮助函数",
+            "support": {
+                "issues": "https://github.com/leftsky/php-help/issues",
+                "source": "https://github.com/leftsky/php-help/tree/0.0.2"
+            },
+            "time": "2022-12-04T02:12:12+00:00"
         },
         {
             "name": "monolog/monolog",
