@@ -255,10 +255,11 @@ trait SimpleCurd
             "appends" => "array",
             "with" => "array"
         ]);
+        $object = $this->dbModel::with(
+            array_merge($this->withs, $argvs["with"] ?? []))
+            ->find($argvs["id"]);
         return rsps(ERR_SUCCESS,
-            $this->dbModel::with(array_merge($this->withs, $argvs["with"] ?? []))
-                ->find($argvs["id"])
-                ->append($argvs["appends"] ?? []));
+            $object ? $object->append($argvs["appends"]) : []);
     }
 
     /**
