@@ -258,7 +258,7 @@ trait SimpleCurd
         if ($object = $this->dbModel::with(
             array_merge($this->withs, $argvs["with"] ?? []))
             ->find($argvs["id"])) {
-            return rsps(ERR_SUCCESS, $object->append($argvs["appends"]));
+            return rsps(ERR_SUCCESS, $object->append($argvs["appends"] ?? []));
         }
         return rsps(ERR_FAILED, null, "记录不存在");
     }
