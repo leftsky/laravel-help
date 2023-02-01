@@ -255,11 +255,12 @@ trait SimpleCurd
             "appends" => "array",
             "with" => "array"
         ]);
-        $object = $this->dbModel::with(
+        if ($object = $this->dbModel::with(
             array_merge($this->withs, $argvs["with"] ?? []))
-            ->find($argvs["id"]);
-        return rsps(ERR_SUCCESS,
-            $object ? $object->append($argvs["appends"]) : []);
+            ->find($argvs["id"])) {
+            return rsps(ERR_SUCCESS, $object->append($argvs["appends"]));
+        }
+        return rsps(ERR_FAILED, null, "记录不存在");
     }
 
     /**
